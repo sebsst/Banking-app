@@ -1,0 +1,59 @@
+banking-app/
+├── backend/
+│   ├── package.json
+│   ├── .env.example
+│   ├── server.js
+│   ├── config/
+│   │   └── database.js
+│   ├── models/
+│   │   ├── index.js
+│   │   ├── User.js
+│   │   ├── Bank.js
+│   │   ├── Account.js
+│   │   └── Balance.js
+│   ├── routes/
+│   │   ├── auth.js
+│   │   ├── banks.js
+│   │   ├── accounts.js
+│   │   └── balances.js
+│   ├── middleware/
+│   │   └── auth.js
+│   └── migrations/
+│       └── init.sql
+├── frontend/
+│   ├── package.json
+│   ├── public/
+│   │   └── index.html
+│   ├── src/
+│   │   ├── index.js
+│   │   ├── App.js
+│   │   ├── components/
+│   │   │   ├── Layout.js
+│   │   │   ├── Auth/
+│   │   │   │   ├── Login.js
+│   │   │   │   └── Register.js
+│   │   │   ├── Banks/
+│   │   │   │   ├── BankList.js
+│   │   │   │   ├── BankForm.js
+│   │   │   │   └── BankDialog.js
+│   │   │   ├── Accounts/
+│   │   │   │   ├── AccountList.js
+│   │   │   │   ├── AccountForm.js
+│   │   │   │   └── AccountDialog.js
+│   │   │   ├── Balances/
+│   │   │   │   ├── BalanceList.js
+│   │   │   │   ├── BalanceForm.js
+│   │   │   │   ├── BalanceDialog.js
+│   │   │   │   └── BalanceChart.js
+│   │   │   └── common/
+│   │   │       ├── DateFilters.js
+│   │   │       └── ConfirmDialog.js
+│   │   ├── services/
+│   │   │   └── api.js
+│   │   ├── utils/
+│   │   │   └── dateUtils.js
+│   │   └── contexts/
+│   │       └── AuthContext.js
+├── docker-compose.yml
+├── README.md
+└── .gitignore
