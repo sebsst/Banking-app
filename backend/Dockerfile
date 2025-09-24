@@ -7,17 +7,17 @@ COPY package*.json ./
 
 # Install dependencies
 RUN npm ci --only=production
+# If no package-lock.json exists, switch to:
+# RUN npm install --only=production
 
 # Copy source code
 COPY . .
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
+# Change ownership of the app directory to the built-in node user
+RUN chown -R node:node /app
 
-# Change ownership of the app directory
-RUN chown -R nodejs:nodejs /app
-USER nodejs
+# Switch to non-root user
+USER node
 
 # Expose port
 EXPOSE 5000

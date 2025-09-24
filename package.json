@@ -1,0 +1,21 @@
+{
+  "name": "banking-app",
+  "version": "1.0.0",
+  "description": "Une application complète de gestion de comptes bancaires développée avec Node.js, React et PostgreSQL.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sebsst/Banking-app.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/sebsst/Banking-app/issues"
+  },
+  "homepage": "https://github.com/sebsst/Banking-app#readme"
+}
