@@ -269,7 +269,7 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// Get chart data
+// Get chart data with totals
 router.get('/chart/data', [
   query('accountIds').optional().custom((value) => {
     if (value) {
@@ -281,7 +281,8 @@ router.get('/chart/data', [
     return true;
   }),
   query('bankId').optional().isInt({ min: 1 }).withMessage('ID de banque invalide'),
-  query('period').optional().isIn(['1d', '7d', '30d', '6m', '1y', 'all']).withMessage('Période invalide')
+  query('period').optional().isIn(['1d', '7d', '30d', '6m', '1y', 'all']).withMessage('Période invalide'),
+  query('includeTotals').optional().isBoolean().withMessage('IncludeTotals doit être un boolean')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -289,7 +290,7 @@ router.get('/chart/data', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { accountIds, bankId, period = 'all' } = req.query;
+    const { accountIds, bankId, period = 'all', includeTotals = false } = req.query;
 
     // Calculate date range
     let startDate = null;
@@ -351,27 +352,160 @@ router.get('/chart/data', [
 
     // Group data by account for chart
     const chartData = {};
+    const bankTotals = {};
+    let globalTotal = 0;
+
     balances.forEach(balance => {
       const accountId = balance.account.id;
       const accountName = `${balance.account.name} (${balance.account.bank.name})`;
+      const bankName = balance.account.bank.name;
+      const amount = parseFloat(balance.amount);
       
       if (!chartData[accountId]) {
         chartData[accountId] = {
           accountName,
+          bankName,
           data: []
         };
       }
       
       chartData[accountId].data.push({
         date: balance.date,
-        amount: parseFloat(balance.amount)
+        amount: amount
       });
+
+      // Calculate totals for the latest date
+      if (includeTotals === 'true') {
+        if (!bankTotals[bankName]) {
+          bankTotals[bankName] = {};
+        }
+        bankTotals[bankName][accountId] = amount;
+      }
     });
 
-    res.json({ chartData: Object.values(chartData) });
+    // Calculate current totals
+    const totals = {};
+    if (includeTotals === 'true') {
+      Object.keys(bankTotals).forEach(bankName => {
+        const accounts = bankTotals[bankName];
+        const bankTotal = Object.values(accounts).reduce((sum, amount) => sum + amount, 0);
+        totals[bankName] = bankTotal;
+        globalTotal += bankTotal;
+      });
+    }
+
+    const response = { 
+      chartData: Object.values(chartData)
+    };
+
+    if (includeTotals === 'true') {
+      response.totals = {
+        byBank: totals,
+        global: globalTotal
+      };
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('Get chart data error:', error);
     res.status(500).json({ error: 'Erreur lors de la récupération des données du graphique' });
+  }
+});
+
+// Export data to CSV
+router.get('/export/csv', async (req, res) => {
+  try {
+    const balances = await Balance.findAll({
+      include: [
+        {
+          model: Account,
+          as: 'account',
+          where: { userId: req.user.id },
+          attributes: ['id', 'name', 'type', 'iban'],
+          include: [
+            {
+              model: Bank,
+              as: 'bank',
+              attributes: ['name']
+            }
+          ]
+        }
+      ],
+      order: [['date', 'DESC']]
+    });
+
+    // Generate CSV content
+    const csvHeader = 'Date,Banque,Compte,Type,IBAN,Montant\n';
+    const csvContent = balances.map(balance => {
+      return [
+        balance.date,
+        balance.account.bank.name,
+        balance.account.name,
+        balance.account.type,
+        balance.account.iban || '',
+        balance.amount
+      ].join(',');
+    }).join('\n');
+
+    const csv = csvHeader + csvContent;
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=banking-data.csv');
+    res.send(csv);
+  } catch (error) {
+    console.error('Export CSV error:', error);
+    res.status(500).json({ error: 'Erreur lors de l\'export CSV' });
+  }
+});
+
+// Import data from CSV
+router.post('/import/csv', async (req, res) => {
+  try {
+    const { csvData } = req.body;
+    
+    if (!csvData) {
+      return res.status(400).json({ error: 'Données CSV manquantes' });
+    }
+
+    const lines = csvData.split('\n').slice(1); // Skip header
+    const importedBalances = [];
+
+    for (const line of lines) {
+      if (line.trim()) {
+        const [date, bankName, accountName, type, iban, amount] = line.split(',');
+        
+        // Find or create account
+        let account = await Account.findOne({
+          where: { 
+            name: accountName.trim(),
+            userId: req.user.id 
+          },
+          include: [{ 
+            model: Bank, 
+            as: 'bank', 
+            where: { name: bankName.trim() } 
+          }]
+        });
+
+        if (account) {
+          // Create balance entry
+          const balance = await Balance.create({
+            amount: parseFloat(amount),
+            date: date.trim(),
+            accountId: account.id
+          });
+          importedBalances.push(balance);
+        }
+      }
+    }
+
+    res.json({ 
+      message: `${importedBalances.length} soldes importés avec succès`,
+      imported: importedBalances.length
+    });
+  } catch (error) {
+    console.error('Import CSV error:', error);
+    res.status(500).json({ error: 'Erreur lors de l\'import CSV' });
   }
 });
 

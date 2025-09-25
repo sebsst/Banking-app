@@ -13,16 +13,25 @@ import {
   Typography,
   Alert,
   CircularProgress,
-  Chip
+  Chip,
+  Grid,
+  Card,
+  CardContent
 } from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  FileDownload as ExportIcon,
+  FileUpload as ImportIcon,
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon
 } from '@mui/icons-material';
 import api from '../../services/api';
 import AccountDialog from './AccountDialog';
 import ConfirmDialog from '../common/ConfirmDialog';
+import ImportExportDialog from '../common/ImportExportDialog';
+import { formatCurrency } from '../../utils/dateUtils';
 
 const accountTypeColors = {
   courant: 'primary',
@@ -41,6 +50,7 @@ function AccountList() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, account: null });
+  const [importExportDialog, setImportExportDialog] = useState({ open: false, mode: 'export' });
 
   useEffect(() => {
     fetchAccounts();
@@ -100,9 +110,46 @@ function AccountList() {
     handleDialogClose();
   };
 
+  const handleExport = () => {
+    setImportExportDialog({ open: true, mode: 'export' });
+  };
+
+  const handleImport = () => {
+    setImportExportDialog({ open: true, mode: 'import' });
+  };
+
   const formatIBAN = (iban) => {
+    if (!iban) return 'Non renseigné';
     return iban.replace(/(.{4})/g, '$1 ').trim();
   };
+
+  const getEvolutionIcon = (percentage) => {
+    if (percentage > 0) {
+      return <TrendingUpIcon sx={{ color: 'success.main', fontSize: 20 }} />;
+    } else if (percentage < 0) {
+      return <TrendingDownIcon sx={{ color: 'error.main', fontSize: 20 }} />;
+    }
+    return null;
+  };
+
+  const getEvolutionColor = (percentage) => {
+    if (percentage > 0) return 'success.main';
+    if (percentage < 0) return 'error.main';
+    return 'text.secondary';
+  };
+
+  // Calculate global statistics
+  const globalStats = accounts.reduce((stats, account) => {
+    if (account.statistics) {
+      stats.totalInitial += account.statistics.initialBalance || 0;
+      stats.totalCurrent += account.statistics.currentBalance || 0;
+      stats.accountsCount += 1;
+    }
+    return stats;
+  }, { totalInitial: 0, totalCurrent: 0, accountsCount: 0 });
+
+  const globalEvolution = globalStats.totalInitial !== 0 ? 
+    ((globalStats.totalCurrent - globalStats.totalInitial) / Math.abs(globalStats.totalInitial)) * 100 : 0;
 
   if (loading) {
     return (
@@ -118,19 +165,95 @@ function AccountList() {
         <Typography variant="h4" component="h1">
           Mes Comptes Bancaires
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleCreateAccount}
-        >
-          Ajouter un compte
-        </Button>
+        <Box display="flex" gap={1}>
+          <Button
+            variant="outlined"
+            startIcon={<ImportIcon />}
+            onClick={handleImport}
+          >
+            Importer
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<ExportIcon />}
+            onClick={handleExport}
+          >
+            Exporter
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleCreateAccount}
+          >
+            Ajouter un compte
+          </Button>
+        </Box>
       </Box>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
           {error}
         </Alert>
+      )}
+
+      {/* Global Statistics */}
+      {accounts.length > 0 && (
+        <Grid container spacing={3} sx={{ mb: 3 }}>
+          <Grid item xs={12} md={3}>
+            <Card>
+              <CardContent>
+                <Typography color="text.secondary" gutterBottom>
+                  Solde Initial Total
+                </Typography>
+                <Typography variant="h6">
+                  {formatCurrency(globalStats.totalInitial)}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <Card>
+              <CardContent>
+                <Typography color="text.secondary" gutterBottom>
+                  Solde Actuel Total
+                </Typography>
+                <Typography variant="h6">
+                  {formatCurrency(globalStats.totalCurrent)}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <Card>
+              <CardContent>
+                <Typography color="text.secondary" gutterBottom>
+                  Évolution Globale
+                </Typography>
+                <Box display="flex" alignItems="center" gap={1}>
+                  {getEvolutionIcon(globalEvolution)}
+                  <Typography 
+                    variant="h6"
+                    sx={{ color: getEvolutionColor(globalEvolution) }}
+                  >
+                    {globalEvolution > 0 ? '+' : ''}{globalEvolution.toFixed(2)}%
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <Card>
+              <CardContent>
+                <Typography color="text.secondary" gutterBottom>
+                  Nombre de Comptes
+                </Typography>
+                <Typography variant="h6">
+                  {globalStats.accountsCount}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
       )}
 
       <TableContainer component={Paper}>
@@ -141,14 +264,16 @@ function AccountList() {
               <TableCell>Type</TableCell>
               <TableCell>Banque</TableCell>
               <TableCell>IBAN</TableCell>
-              <TableCell>Date de création</TableCell>
+              <TableCell align="right">Solde Initial</TableCell>
+              <TableCell align="right">Solde Actuel</TableCell>
+              <TableCell align="right">Évolution</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {accounts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={8} align="center">
                   <Typography color="text.secondary">
                     Aucun compte trouvé. Commencez par créer votre premier compte.
                   </Typography>
@@ -185,8 +310,46 @@ function AccountList() {
                       {formatIBAN(account.iban)}
                     </Typography>
                   </TableCell>
-                  <TableCell>
-                    {new Date(account.createdAt).toLocaleDateString('fr-FR')}
+                  <TableCell align="right">
+                    <Typography variant="body2">
+                      {account.statistics ? 
+                        formatCurrency(account.statistics.initialBalance) : 
+                        'N/A'
+                      }
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Typography 
+                      variant="body2" 
+                      fontWeight="medium"
+                      sx={{ 
+                        color: account.statistics && account.statistics.currentBalance >= 0 ? 
+                          'success.main' : 'error.main' 
+                      }}
+                    >
+                      {account.statistics ? 
+                        formatCurrency(account.statistics.currentBalance) : 
+                        'N/A'
+                      }
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    {account.statistics && account.statistics.balanceCount > 1 ? (
+                      <Box display="flex" alignItems="center" justifyContent="flex-end" gap={1}>
+                        {getEvolutionIcon(account.statistics.evolutionPercentage)}
+                        <Typography 
+                          variant="body2"
+                          sx={{ color: getEvolutionColor(account.statistics.evolutionPercentage) }}
+                        >
+                          {account.statistics.evolutionPercentage > 0 ? '+' : ''}
+                          {account.statistics.evolutionPercentage}%
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        N/A
+                      </Typography>
+                    )}
                   </TableCell>
                   <TableCell align="right">
                     <IconButton
@@ -225,9 +388,15 @@ function AccountList() {
         onConfirm={handleConfirmDelete}
         onCancel={() => setDeleteDialog({ open: false, account: null })}
       />
+
+      <ImportExportDialog
+        open={importExportDialog.open}
+        mode={importExportDialog.mode}
+        onClose={() => setImportExportDialog({ open: false, mode: 'export' })}
+        onImportComplete={fetchAccounts}
+      />
     </Box>
   );
 }
 
 export default AccountList;
-  

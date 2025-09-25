@@ -11,7 +11,10 @@ import {
   ListItemText,
   OutlinedInput,
   CircularProgress,
-  Alert
+  Alert,
+  Grid,
+  Card,
+  CardContent
 } from '@mui/material';
 import {
   Chart as ChartJS,
@@ -57,6 +60,7 @@ const colors = [
 
 function BalanceChart() {
   const [chartData, setChartData] = useState({ datasets: [] });
+  const [totals, setTotals] = useState({ byBank: {}, global: 0 });
   const [accounts, setAccounts] = useState([]);
   const [banks, setBanks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -122,6 +126,7 @@ function BalanceChart() {
       if (dateRange.period) {
         params.append('period', dateRange.period);
       }
+      params.append('includeTotals', 'true');
 
       const response = await api.get(`/balances/chart/data?${params.toString()}`);
       
@@ -138,6 +143,7 @@ function BalanceChart() {
       }));
 
       setChartData({ datasets });
+      setTotals(response.data.totals || { byBank: {}, global: 0 });
     } catch (error) {
       setError('Erreur lors de la récupération des données du graphique');
     } finally {
@@ -291,6 +297,52 @@ function BalanceChart() {
           />
         </Box>
       </Paper>
+
+      {/* Totals Summary */}
+      {Object.keys(totals.byBank).length > 0 && (
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Typography variant="h6" gutterBottom>
+            Résumé des soldes actuels
+          </Typography>
+          
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography variant="h6" color="primary" gutterBottom>
+                    Total Global
+                  </Typography>
+                  <Typography variant="h4" fontWeight="bold">
+                    {formatCurrency(totals.global)}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    Répartition par banque
+                  </Typography>
+                  <Box>
+                    {Object.entries(totals.byBank).map(([bankName, total]) => (
+                      <Box key={bankName} display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                        <Typography variant="body1">
+                          {bankName}
+                        </Typography>
+                        <Typography variant="h6" fontWeight="medium" color="primary">
+                          {formatCurrency(total)}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </Paper>
+      )}
 
       {/* Chart */}
       <Paper sx={{ p: 2, height: 500 }}>

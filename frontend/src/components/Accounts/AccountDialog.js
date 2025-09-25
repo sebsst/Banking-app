@@ -226,7 +226,7 @@ function AccountDialog({ open, account, onClose, onSave }) {
             type="text"
             fullWidth
             variant="outlined"
-            required
+            // required
             value={formData.iban}
             onChange={handleIBANChange}
             disabled={loading}

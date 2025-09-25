@@ -22,16 +22,17 @@ const Account = sequelize.define('Account', {
   },
   iban: {
     type: DataTypes.STRING(34),
-    allowNull: false,
+    allowNull: true,
     unique: true,
     validate: {
-      notEmpty: true,
       len: [15, 34],
       isIBAN(value) {
-        // Basic IBAN validation (simplified)
-        const ibanRegex = /^[A-Z]{2}[0-9]{2}[A-Z0-9]+$/;
-        if (!ibanRegex.test(value.replace(/\s/g, ''))) {
-          throw new Error('Format IBAN invalide');
+        // Basic IBAN validation (simplified) - only if provided
+        if (value && value.trim()) {
+          const ibanRegex = /^[A-Z]{2}[0-9]{2}[A-Z0-9]+$/;
+          if (!ibanRegex.test(value.replace(/\s/g, ''))) {
+            throw new Error('Format IBAN invalide');
+          }
         }
       }
     }

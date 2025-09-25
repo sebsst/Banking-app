@@ -8,7 +8,7 @@ const router = express.Router();
 // Protect all routes
 router.use(authenticateToken);
 
-// Get user's accounts
+// Get user's accounts with balance information
 router.get('/', async (req, res) => {
   try {
     const accounts = await Account.findAll({
@@ -18,11 +18,40 @@ router.get('/', async (req, res) => {
           model: Bank,
           as: 'bank',
           attributes: ['id', 'name', 'code']
+        },
+        {
+          model: Balance,
+          as: 'balances',
+          attributes: ['amount', 'date'],
+          order: [['date', 'ASC']]
         }
       ],
       order: [['createdAt', 'DESC']]
     });
-    res.json(accounts);
+
+    // Calculate statistics for each account
+    const accountsWithStats = accounts.map(account => {
+      const balances = account.balances || [];
+      const initialBalance = balances.length > 0 ? parseFloat(balances[0].amount) : 0;
+      const currentBalance = balances.length > 0 ? parseFloat(balances[balances.length - 1].amount) : 0;
+      
+      let evolutionPercentage = 0;
+      if (initialBalance !== 0 && balances.length > 1) {
+        evolutionPercentage = ((currentBalance - initialBalance) / Math.abs(initialBalance)) * 100;
+      }
+
+      return {
+        ...account.toJSON(),
+        statistics: {
+          initialBalance,
+          currentBalance,
+          evolutionPercentage: Math.round(evolutionPercentage * 100) / 100,
+          balanceCount: balances.length
+        }
+      };
+    });
+
+    res.json(accountsWithStats);
   } catch (error) {
     console.error('Get accounts error:', error);
     res.status(500).json({ error: 'Erreur lors de la récupération des comptes' });
